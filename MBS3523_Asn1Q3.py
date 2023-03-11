@@ -24,7 +24,7 @@ while True:
     cv2.putText(frame, text, (int(width / 2 - 200), 20), font, 0.5, (255,0,0), 2)
     frame=cv2.rectangle(frame,(posX,posY),(posX+BW,posY+BH),(0,0,255),2)
     posX=posX+dx
-    posY=posY+dy
+    posY=posY-dy
     if posX<=0 or posX+BW>=dispW:
         dx=dx*(-1)
     if posY<=0 or posY+BH>=dispH:
