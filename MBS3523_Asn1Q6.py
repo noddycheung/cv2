@@ -12,7 +12,7 @@ def drawShape(event,x,y,flags,params):
         PNT2 = (x,y)
         EVT = event
 
-    elif event == cv2.EVENT_RBUTTONDOWN:
+    elif event == cv2.EVENT_RBUTTONUP:
         EVT = event
 cv2.namedWindow('image')
 cv2.setMouseCallback('image',drawShape)
@@ -30,8 +30,10 @@ while True:
         cv2.imshow('ROI',ROI)
     if EVT == 5:
         image[:,:] = image
-        cv2.destroyWindows('ROI')
-        ENT=0
+        try:
+            cv2.destroyWindow('ROI')
+        except:
+            ENT=0
     cv2.imshow('image',image)
 
     if cv2.waitKey(1) & 0xff == 27:
