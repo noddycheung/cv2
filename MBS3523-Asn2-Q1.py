@@ -18,14 +18,18 @@ model = load_model('Resources/keras_model.h5')
 t_old = 0
 t_new = 0
 
-def get_className(classNo):
-    if classNo == 0:
-        return "cheung tsz chun noddy"
-    elif classNo == 1:
-        return "oscar"
-    elif classNo == 2:
-        return "kai ming"
+# Define known persons and their labels
+known_persons = {
+    'cheung tsz chun noddy': 0,
+    'oscar': 1,
+    'kai ming': 2
+}
 
+def get_className(classNo):
+    for name, label in known_persons.items():
+        if label == classNo:
+            return name
+    return 'Unknown Person'
 
 while True:
     ret, img = cam.read()
@@ -41,7 +45,7 @@ while True:
             x2 = int((boundingBox.xmin + boundingBox.width) * 1280)
             y2 = int((boundingBox.ymin + boundingBox.height) * 720)
             pt1 = (x1, y1)
-            pt2 = (x2,y2)
+            pt2 = (x2, y2)
             cv2.rectangle(img, pt1, pt2, (255, 0, 0), 3)
             crop_img = img[y1:y2, x1:x2]
             imgResize = cv2.resize(crop_img, (224, 224))
@@ -58,12 +62,17 @@ while True:
             cv2.rectangle(img, (x1, y1 - 40), (x2, y1), (80, 255, 0), -2)
             cv2.putText(img, str(get_className(classIndex)), (x1, y1 - 10), font, 0.75, (255, 255, 255), 1, cv2.LINE_AA)
             cv2.putText(img, str(round(probabilityValue * 100, 2)) + "%", (10, 110), font, 1, (255, 0, 0), 2,
-                    cv2.LINE_AA)
+                        cv2.LINE_AA)
             cv2.putText(img, str(round(probabilityValue * 100, 2)) + "%", (x1, y1 - 50), font, 0.75, (255, 255, 255), 1,
                         cv2.LINE_AA)
             cv2.putText(img, str(get_className(classIndex)), (10, 80), font, 1, (255, 0, 0), 2,
-                                 cv2.LINE_AA)
-       
+                        cv2.LINE_AA)
+        else:
+            cv2.putText(img, str(get_className(classIndex)), (10, 110), font, 1.5, (255, 0, 0), 2, cv2.LINE_AA)
+            cv2.putText(img, str(get_className(classIndex)) , (x1, y1 - 10), font, 0.75, (255, 255, 255), 1,
+                        cv2.LINE_AA)
+
+
     if results.detections == None:
         cv2.putText(img, str('Unknown Person'), (10, 110), font, 1.5, (255, 0, 0), 2, cv2.LINE_AA)
 
