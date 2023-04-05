@@ -1,9 +1,17 @@
-#Face tracker using OpenCV and Arduino
-#by Shubham Santosh
-
 import cv2
 import serial,time
-face_cascade= cv2.CascadeClassifier('Resources/haarcascade_frontalface_default.xml')
+import numpy as np
+
+classesFile = 'For YOLO/coco80.names'
+classes = open(classesFile, 'r').read().splitlines()
+confThreshold = 0.6
+
+net = cv2.dnn.readNetFromDarknet('For YOLO/yolov3-320.cfg', 'For YOLO/yolov3-320.weights')
+net.setPreferableBackend(cv2.dnn.DNN_BACKEND_OPENCV)
+net.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
+
+class_of_interest = 67  # index of "cell phone"
+
 cap=cv2.VideoCapture(1, cv2.CAP_DSHOW)
 #fourcc= cv2.VideoWriter_fourcc(*'XVID')
 ArduinoSerial=serial.Serial('com3',9600,timeout=0.1)
@@ -12,11 +20,36 @@ time.sleep(1)
 
 while cap.isOpened():
     ret, frame= cap.read()
-    frame=cv2.flip(frame,1)  #mirror the image
-    #print(frame.shape)
-    gray = cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY)
-    faces= face_cascade.detectMultiScale(gray,1.3,6)  #detect the face
-    for x,y,w,h in faces:
+    height, width, ch = frame.shape
+
+    blob = cv2.dnn.blobFromImage(frame, 1 / 255, (320, 320), (0, 0, 0), swapRB=True, crop=False)
+    net.setInput(blob)
+
+    outputs = net.forward(net.getUnconnectedOutLayersNames())
+    boxes, confidences = [], []
+
+    for output in outputs:
+        for detection in output:
+            scores = detection[5:]
+            class_id = np.argmax(scores)
+            confidence = scores[class_id]
+            if confidence > confThreshold and class_id == class_of_interest:
+                center_x, center_y, w, h = map(int, detection[:4] * [width, height, width, height])
+                x, y = center_x - w // 2, center_y - h // 2
+                boxes.append([x, y, w, h])
+                confidences.append(confidence)
+
+    indexes = cv2.dnn.NMSBoxes(boxes, confidences, confThreshold, 0.4)
+    font, colors = cv2.FONT_HERSHEY_PLAIN, np.random.uniform(0, 255, size=(len(boxes), 3))
+
+    if len(indexes) > 0:
+        for i in indexes.flatten():
+            x, y, w, h = boxes[i]
+            label, color = str(classes[class_of_interest]), colors[i]
+            cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
+            cv2.putText(frame, f"{label}", (x, y + 20), font, 2, (255, 255, 255), 2)
+
+    for x,y,w,h in boxes:
         #sending coordinates to Arduino
         string='X{0:d}Y{1:d}'.format((x+w//2),(y+h//2))
         print(string)
@@ -41,4 +74,4 @@ while cap.isOpened():
     if cv2.waitKey(10)&0xFF== ord('q'):
         break
 cap.release()
-cv2.destroyAllWindows()
+cv2
