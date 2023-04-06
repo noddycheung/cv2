@@ -22,7 +22,8 @@ t_new = 0
 known_persons = {
     'cheung tsz chun noddy': 0,
     'oscar': 1,
-    'kai ming': 2
+    'kai ming': 2,
+    'Unknown Person' :3
 }
 
 def get_className(classNo):
