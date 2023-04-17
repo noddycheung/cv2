@@ -2,19 +2,19 @@ import cv2
 import serial,time
 import numpy as np
 
-classesFile = 'For YOLO/coco80.names'
+classesFile = 'For YOLO/For YOLO/coco80.names'
 classes = open(classesFile, 'r').read().splitlines()
 confThreshold = 0.6
 
-net = cv2.dnn.readNetFromDarknet('For YOLO/yolov3-320.cfg', 'For YOLO/yolov3-320.weights')
+net = cv2.dnn.readNetFromDarknet('For YOLO/For YOLO/yolov3-320.cfg', 'For YOLO/For YOLO/yolov3-320.weights')
 net.setPreferableBackend(cv2.dnn.DNN_BACKEND_OPENCV)
 net.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
 
-class_of_interest = 67  # index of "cell phone"
+class_of_interest = 67  # index of "remote"
 
-cap=cv2.VideoCapture(1, cv2.CAP_DSHOW)
+cap=cv2.VideoCapture(0, cv2.CAP_DSHOW)
 #fourcc= cv2.VideoWriter_fourcc(*'XVID')
-ArduinoSerial=serial.Serial('com3',9600,timeout=0.1)
+ArduinoSerial=serial.Serial('com6',9600,timeout=0.1)
 #out= cv2.VideoWriter('face detection4.avi',fourcc,20.0,(640,480))
 time.sleep(1)
 
@@ -74,4 +74,4 @@ while cap.isOpened():
     if cv2.waitKey(10)&0xFF== ord('q'):
         break
 cap.release()
-cv2
+cv2.destroyAllWindows()
