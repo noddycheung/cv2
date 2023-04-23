@@ -1,0 +1,111 @@
+from djitellopy import tello
+import KeyPressModule as kp
+import time
+import tensorflow as tf
+from tensorflow import keras
+import cv2
+import mediapipe as mp
+from keras.models import load_model
+import numpy as np
+import time
+
+detect = mp.solutions.face_detection.FaceDetection(min_detection_confidence=0.6)
+
+cam = cv2.VideoCapture(0)
+# cam.set(3, 1280)
+# cam.set(4, 720)
+font = cv2.FONT_HERSHEY_COMPLEX
+model = load_model('converted_keras (1)/keras_model.h5')
+
+# variables for FPS
+t_old = 0
+t_new = 0
+
+# Define known persons and their labels
+known_persons = {
+    'wall crack': 0,
+    'wall Crack': 1,
+}
+
+def get_className(classNo):
+    for name, label in known_persons.items():
+        if label == classNo:
+            return name
+
+kp.init()
+me = tello.Tello()
+me.connect()
+print(me.get_battery())
+global img
+me.streamon()
+
+def getKeyboardInput():
+    lr,fb,ud,yv = 0,0,0,0
+    speed = 50
+
+    if kp.getKey("LEFT"): lr=-speed
+    elif kp.getKey("RIGHT"): lr = speed
+
+    if kp.getKey("UP"): fb = speed
+    elif kp.getKey("DOWN"): fb = -speed
+
+    if kp.getKey("w"): ud = speed
+    elif kp.getKey("s"): ud = -speed
+
+    if kp.getKey("a"):yv = speed
+    elif kp.getKey("d"):yv = -speed
+
+    if kp.getKey("q"): me.land(); time.sleep(3)
+    if kp.getKey("e"): me.takeoff()
+
+    if kp.getKey('z'):
+        cv2.imwrite(f'Resources/Images/{time.time()}.jpg',img)
+        time.sleep(0.3)
+
+    return [lr,fb,ud,yv]
+
+while True:
+    vals = getKeyboardInput()
+    me.send_rc_control(vals[0],vals[1],vals[2],vals[3])
+    ret, img = me.get_frame_read().frame
+    img = cv2.resize(img, (360, 240))
+
+    faces = detect.detectMultiScale(img, 1.3, 5)
+    for x, y, w, h in faces:
+        crop_img = img[y:y + h, x:x + h]
+        img = cv2.resize(crop_img, (224, 224))
+        img = img.reshape(1, 224, 224, 3)
+        prediction = model.predict(img)
+        # print(prediction)
+        classIndex = np.argmax(prediction)
+        # print(classIndex)
+        probabilityValue = np.amax(prediction)
+
+        if classIndex == 0 or 1:
+            cv2.rectangle(img, (x, y), (x + w, y + h), (80, 255, 0), 2)
+            cv2.rectangle(img, (x, y - 40), (x + w, y), (80, 255, 0), -2)
+            cv2.putText(img, str(get_className(classIndex)), (x, y - 10), font, 0.75, (255, 255, 255), 1, cv2.LINE_AA)
+            cv2.putText(img, str(round(probabilityValue * 100, 2)) + "%", (10, 110), font, 1.5, (255, 0, 0), 2,
+                        cv2.LINE_AA)
+
+    # Calculate FPS and display on upper left
+    t_new = time.time()
+    fps = 1 / (t_new - t_old)
+    t_old = t_new
+    cv2.putText(img, 'FPS = ' + str(int(fps)), (10, 50), cv2.FONT_HERSHEY_PLAIN, 3,
+                (255, 0, 255), 3)
+
+# Calculate FPS and display on upper left
+    t_new = time.time()
+    fps = 1 / (t_new - t_old)
+    t_old = t_new
+    cv2.putText(img, 'FPS = ' + str(int(fps)), (10, 50), cv2.FONT_HERSHEY_PLAIN, 3,
+                (255, 0, 255), 3)
+
+    cv2.imshow("Face Recognition Result", img)
+    if cv2.waitKey(1) & 0xff == 27:
+        break
+
+cam.release()
+cv2.destroyAllWindows()
+
