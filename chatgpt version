@@ -1,0 +1,97 @@
+from djitellopy import tello
+import KeyPressModule as kp
+import cv2
+import mediapipe as mp
+from keras.models import load_model
+import numpy as np
+import time
+
+kp.init()
+me = tello.Tello()
+me.connect()
+print(me.get_battery())
+me.streamon()
+
+font = cv2.FONT_HERSHEY_COMPLEX
+model = load_model('converted_keras (1)/keras_model.h5')
+
+# Define known objects and their labels
+known_objects = {
+    'wall crack': 0,
+    'wall Crack': 1,
+}
+
+def get_className(classNo):
+    for name, label in known_objects.items():
+        if label == classNo:
+            return name
+
+def getKeyboardInput():
+    lr, fb, ud, yv = 0, 0, 0, 0
+    speed = 50
+
+    if kp.getKey("LEFT"): lr=-speed
+    elif kp.getKey("RIGHT"): lr = speed
+
+    if kp.getKey("UP"): fb = speed
+    elif kp.getKey("DOWN"): fb = -speed
+
+    if kp.getKey("w"): ud = speed
+    elif kp.getKey("s"): ud = -speed
+
+    if kp.getKey("a"):yv = speed
+    elif kp.getKey("d"):yv = -speed
+
+    if kp.getKey("q"): me.land(); time.sleep(3)
+    if kp.getKey("e"): me.takeoff()
+
+    if kp.getKey('z'):
+        cv2.imwrite(f'Resources/Images/{time.time()}.jpg',img)
+        time.sleep(0.3)
+
+    return [lr, fb, ud, yv]
+
+with me.get_frame_read() as cam:
+    # Define object detection model
+    detect = mp.solutions.objectron.Objectron(model_complexity=2,
+                                              enable_tracking=True,
+                                              detection_confidence=0.5,
+                                              max_num_objects=1)
+    while True:
+        vals = getKeyboardInput()
+        me.send_rc_control(vals[0], vals[1], vals[2], vals[3])
+        img = cam.frame
+        img = cv2.resize(img, (360, 240))
+
+        # Detect objects in the image
+        results = detect.process(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+        if results.detected_objects:
+            obj = results.detected_objects[0]
+            if obj.class_name == 'wall crack':
+                x, y, w, h = obj.bounding_box
+                if w > 50 and h > 50 and w < 150 and h < 150:
+                    crop_img = img[y:y + h, x:x + w]
+                    img = cv2.resize(crop_img, (224, 224))
+                    img = img.reshape(1, 224, 224, 3)
+                    prediction = model.predict(img)
+                    classIndex = np.argmax(prediction)
+                    probabilityValue = np.amax(prediction)
+
+                    if classIndex == 0 or 1:
+                        cv2.rectangle(img, (x, y), (x + w, y + h), (80, 255, 0), 2)
+                        cv2.rectangle(img, (x, y - 40), (x + w, y), (80, 255, 0), -2)
+                        cv2.putText(img, str(get_className(classIndex)), (x, y - 10), font, 0.75, (255, 255, 255), 1, cv2.LINE_AA)
+                        cv2.putText(img, str(round(probabilityValue * 100, 2)) + "%", (10, 110), font, 1.5, (255, 0, 0), 2,
+                                    cv2.LINE_AA)
+
+        # Calculate FPS and display on upper left
+        cv2.putText(img, 'FPS = ' + str(int(1 / cam.get_frame_interval())), (10, 50), cv2.FONT_HERSHEY_PLAIN, 3,
+                    (255, 0, 255), 3)
+
+        cv2.imshow("Wall Recognition Result", img)
+        if cv2.waitKey(1) & 0xff == 27:
+            break
+
+me.land()
+me.end()
+cv2.destroyAllWindows()
