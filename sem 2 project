@@ -1,6 +1,5 @@
 from djitellopy import tello
 import KeyPressModule as kp
-import time
 import tensorflow as tf
 from tensorflow import keras
 import cv2
@@ -9,9 +8,16 @@ from keras.models import load_model
 import numpy as np
 import time
 
+kp.init()
+me = tello.Tello()
+me.connect()
+print(me.get_battery())
+global img
+me.streamon()
+
 detect = mp.solutions.face_detection.FaceDetection(min_detection_confidence=0.6)
 
-cam = cv2.VideoCapture(0)
+cam = me.get_frame_read().frame
 # cam.set(3, 1280)
 # cam.set(4, 720)
 font = cv2.FONT_HERSHEY_COMPLEX
@@ -31,13 +37,6 @@ def get_className(classNo):
     for name, label in known_persons.items():
         if label == classNo:
             return name
-
-kp.init()
-me = tello.Tello()
-me.connect()
-print(me.get_battery())
-global img
-me.streamon()
 
 def getKeyboardInput():
     lr,fb,ud,yv = 0,0,0,0
@@ -67,11 +66,11 @@ def getKeyboardInput():
 while True:
     vals = getKeyboardInput()
     me.send_rc_control(vals[0],vals[1],vals[2],vals[3])
-    ret, img = me.get_frame_read().frame
+    img = me.get_frame_read().frame
     img = cv2.resize(img, (360, 240))
 
-    faces = detect.detectMultiScale(img, 1.3, 5)
-    for x, y, w, h in faces:
+    walls = detect.detectMultiScale(img, 1.3, 5)
+    for x, y, w, h in walls:
         crop_img = img[y:y + h, x:x + h]
         img = cv2.resize(crop_img, (224, 224))
         img = img.reshape(1, 224, 224, 3)
@@ -102,7 +101,7 @@ while True:
     cv2.putText(img, 'FPS = ' + str(int(fps)), (10, 50), cv2.FONT_HERSHEY_PLAIN, 3,
                 (255, 0, 255), 3)
 
-    cv2.imshow("Face Recognition Result", img)
+    cv2.imshow("Wall Recognition Result", img)
     if cv2.waitKey(1) & 0xff == 27:
         break
 
