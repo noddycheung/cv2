@@ -1,88 +1,79 @@
 import cv2
+from djitellopy import tello
+import cvzone
 import time
-import numpy as np
+import KeyPressModule as kp
 
-classesFile = 'For YOLO/coco80.names'
-classes = open(classesFile, 'r').read().splitlines()
-confThreshold = 0.3
 
-net = cv2.dnn.readNetFromDarknet('For YOLO/yolov3-320.cfg', 'For YOLO/yolov3-320.weights')
-net.setPreferableBackend(cv2.dnn.DNN_BACKEND_OPENCV)
-net.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
+kp.init()
+global img
+me = tello.Tello()
+me.connect()
+print(me.get_battery())
+me.streamoff()
+me.streamon()
 
-class_of_interest = 0
+thres = 0.55
+nmsThres = 0.2
+# cap = cv2.VideoCapture(0)
+# cap.set(3, 640)
+# cap.set(4, 480)
 
-cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+classNames = []
+classFile = 'For YOLO/coco.names'
+with open(classFile, 'rt') as f:
+    classNames = f.read().split('\n')
+print(classNames)
+configPath = 'For YOLO/ssd_mobilenet_v3_large_coco_2020_01_14.pbtxt'
+weightsPath = "For YOLO/frozen_inference_graph.pb"
 
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+net = cv2.dnn_DetectionModel(weightsPath, configPath)
+net.setInputSize(320, 320)
+net.setInputScale(1.0 / 127.5)
+net.setInputMean((127.5, 127.5, 127.5))
+net.setInputSwapRB(True)
 
-time.sleep(1)
 
-prev_boxes = []
+def getKeyboardInput():
+    lr,fb,ud,yv = 0,0,0,0
+    speed = 50
 
-while cap.isOpened():
-    ret, frame = cap.read()
-    height, width, ch = frame.shape
+    if kp.getKey("LEFT"): lr=-speed
+    elif kp.getKey("RIGHT"): lr = speed
 
-    blob = cv2.dnn.blobFromImage(frame, 1 / 255, (320, 320), (0, 0, 0), swapRB=True, crop=False)
-    net.setInput(blob)
+    if kp.getKey("UP"): fb = speed
+    elif kp.getKey("DOWN"): fb = -speed
 
-    outputs = net.forward(net.getUnconnectedOutLayersNames())
-    boxes, confidences = [], []
+    if kp.getKey("w"): ud = speed
+    elif kp.getKey("s"): ud = -speed
 
-    for output in outputs:
-        for detection in output:
-            scores = detection[5:]
-            class_id = np.argmax(scores)
-            confidence = scores[class_id]
-            if confidence > confThreshold and class_id == class_of_interest:
-                center_x, center_y, w, h = map(int, detection[:4] * [width, height, width, height])
-                x, y = center_x - w // 2, center_y - h // 2
-                boxes.append([x, y, w, h])
-                confidences.append(confidence)
+    if kp.getKey("a"):yv = speed
+    elif kp.getKey("d"):yv = -speed
 
-    # Remove duplicate detections
-    boxes, confidences = np.array(boxes), np.array(confidences)
-    indexes = cv2.dnn.NMSBoxes(boxes, confidences, confThreshold, 0.4)
-    if len(indexes) > 0:
-        boxes, confidences = boxes[indexes.flatten()], confidences[indexes.flatten()]
+    if kp.getKey("q"): me.land(); time.sleep(3)
+    if kp.getKey("e"): me.takeoff()
 
-    font, colors = cv2.FONT_HERSHEY_PLAIN, np.random.uniform(0, 255, size=(len(boxes), 3))
+    if kp.getKey('z'):
+        cv2.imwrite(f'Resources/Images/{time.time()}.jpg',img)
+        time.sleep(0.3)
 
-    if len(boxes) > 0:
-        for i in range(len(boxes)):
-            x, y, w, h = boxes[i]
-            label, color = str(classes[class_of_interest]), colors[i]
-            cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
-            cv2.putText(frame, f"{label}", (x, y + 20), font, 2, (255, 255, 255), 2)
+    return [lr,fb,ud,yv]
 
-    for x, y, w, h in boxes:
-        if [x, y, w, h] not in prev_boxes:
-            # sending coordinates to Arduino
-            string = 'X{0:d}Y{1:d}'.format((x + w // 2), (y + h // 2))
-            print(string)
-            #ArduinoSerial.write(string.encode('utf-8'))
-            # plot the center of the face
-            cv2.circle(frame, (x + w // 2, y + h // 2), 2, (0, 255, 0), 2)
-            # roi
-            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 255), 3)
-            prev_boxes.append([x, y, w, h])
-    # squared region in the center of the screen
-    cv2.rectangle(frame, (1280 // 2 - 30, 720 // 2 - 30),
-                  (1280 // 2 + 30, 720 // 2 + 30),
-                  (255, 255, 255), 3)
+while True:
+    # success, img = cap.read()
+    img = me.get_frame_read().frame
+    classIds, confs, bbox = net.detect(img, confThreshold=thres, nmsThreshold=nmsThres)
+    try:
+        for classId, conf, box in zip(classIds.flatten(), confs.flatten(), bbox):
+            cvzone.cornerRect(img, box)
+            cv2.putText(img, f'{classNames[classId - 1].upper()} {round(conf * 100, 2)}',
+                        (box[0] + 10, box[1] + 30), cv2.FONT_HERSHEY_COMPLEX_SMALL,
+                        1, (0, 255, 0), 2)
+    except:
+        pass
 
-    # out.write(frame)
-    cv2.imshow('img', frame)
-    # cv2.imwrite('output_img.jpg',frame)
-    '''for testing purpose
-    read= str(ArduinoSerial.readline(ArduinoSerial.inWaiting()))
-    time.sleep(0.05)
-    print('data from arduino:'+read)
-    '''
+    vals = getKeyboardInput()
+    me.send_rc_control(vals[0], vals[1], vals[2], vals[3])
 
-    if cv2.waitKey(10) & 0xFF == 27:
-        break
-cap.release()
-cv2.destroyAllWindows()
+    cv2.imshow("Image", img)
+    cv2.waitKey(1)
