@@ -13,17 +13,20 @@ print(me.get_battery())
 me.streamoff()
 me.streamon()
 
+
 thres = 0.55
 nmsThres = 0.2
 # cap = cv2.VideoCapture(0)
 # cap.set(3, 640)
 # cap.set(4, 480)
 
-classNames = []
 classFile = 'For YOLO/coco.names'
+classNames = []
 with open(classFile, 'rt') as f:
-    classNames = f.read().split('\n')
-print(classNames)
+    classNames = f.read().rstrip('\n').split('\n')
+
+class_of_interest = classNames.index('person') + 1
+
 configPath = 'For YOLO/ssd_mobilenet_v3_large_coco_2020_01_14.pbtxt'
 weightsPath = "For YOLO/frozen_inference_graph.pb"
 
@@ -65,10 +68,11 @@ while True:
     classIds, confs, bbox = net.detect(img, confThreshold=thres, nmsThreshold=nmsThres)
     try:
         for classId, conf, box in zip(classIds.flatten(), confs.flatten(), bbox):
-            cvzone.cornerRect(img, box)
-            cv2.putText(img, f'{classNames[classId - 1].upper()} {round(conf * 100, 2)}',
-                        (box[0] + 10, box[1] + 30), cv2.FONT_HERSHEY_COMPLEX_SMALL,
-                        1, (0, 255, 0), 2)
+            if classId == class_of_interest:
+                cvzone.cornerRect(img, box)
+                cv2.putText(img, f'{classNames[classId - 1].upper()} {round(conf * 100, 2)}',
+                            (box[0] + 10, box[1] + 30), cv2.FONT_HERSHEY_COMPLEX_SMALL,
+                            1, (0, 255, 0), 2)
     except:
         pass
 
