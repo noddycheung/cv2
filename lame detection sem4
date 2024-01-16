@@ -24,6 +24,9 @@ class HoughBundler:
         px, py = point
         x1, y1, x2, y2 = line
 
+        # def lineMagnitude(x1, y1, x2, y2):
+        #     lineMagnitude = math.sqrt(math.pow((x2 - x1), 2) + math.pow((y2 - y1), 2))
+        #     return lineMagnitude
         def lineMagnitude(x1, y1, x2, y2):
             lineMagnitude = math.sqrt(math.pow((x2 - x1), 2) + math.pow((y2 - y1), 2))
             return lineMagnitude
@@ -114,10 +117,22 @@ class HoughBundler:
 
         return merged_lines_all
 
+# def region_of_interest(image):
+#     height = image.shape[0]
+#     width = image.shape[1]
+#     polygons = np.array([
+#         [(0, height), (width, height), (700, 450), (500, 500)]
+#     ])
+#     mask = np.zeros_like(image)
+#     cv2.fillPoly(mask, polygons, 255)
+#     masked_image = cv2.bitwise_and(image, mask)
+#     return masked_image
+
 def region_of_interest(image):
     height = image.shape[0]
+    width = image.shape[1]
     polygons = np.array([
-        [(200, height), (1000, height), (700, 400), (500, 400)]
+        [(0, height), (width, height), (700, 450), (500, 500)]
     ])
     mask = np.zeros_like(image)
     cv2.fillPoly(mask, polygons, 255)
@@ -132,10 +147,10 @@ while video.isOpened():
     frame = cv2.GaussianBlur(orig_frame, (5, 5), 0)
 
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    low_yellow = np.array([18, 94, 140])
+    # low_yellow = np.array([18, 94, 140])
+    # up_yellow = np.array([48, 255, 255])
+    low_yellow = np.array([18, 94, 105])
     up_yellow = np.array([48, 255, 255])
-    # low_yellow = np.array([0, 0, 168])
-    # up_yellow = np.array([172, 111, 255])
     mask = cv2.inRange(hsv, low_yellow, up_yellow)
     edges = cv2.Canny(mask, 75, 150)
     # lines = cv2.HoughLinesP(edges, 1, np.pi/180, 50, maxLineGap=50)
@@ -152,8 +167,9 @@ while video.isOpened():
             x2, y2 = map(int, line[1])
             cv2.line(frame, (x1, y1), (x2, y2), (0, 255, 0), 5)
 
-    cv2.imshow("cropped_image", cropped_image)
     cv2.imshow("frame", frame)
+    cv2.imshow("cropped_image", cropped_image)
+
 
     key = cv2.waitKey(1)
     if key == 27:
