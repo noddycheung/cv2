@@ -3,6 +3,9 @@ import numpy as np
 import math
 
 video = cv2.VideoCapture("road_car_view.mp4")
+GREEN = (0, 255, 0)
+THICKNESS = 5
+coordinates = []
 
 class HoughBundler:
     def get_orientation(self, line):
@@ -24,9 +27,6 @@ class HoughBundler:
         px, py = point
         x1, y1, x2, y2 = line
 
-        # def lineMagnitude(x1, y1, x2, y2):
-        #     lineMagnitude = math.sqrt(math.pow((x2 - x1), 2) + math.pow((y2 - y1), 2))
-        #     return lineMagnitude
         def lineMagnitude(x1, y1, x2, y2):
             lineMagnitude = math.sqrt(math.pow((x2 - x1), 2) + math.pow((y2 - y1), 2))
             return lineMagnitude
@@ -63,8 +63,6 @@ class HoughBundler:
 
     def merge_lines_pipeline_2(self, lines):
         groups = []
-        # min_distance_to_merge = 30
-        # min_angle_to_merge = 30
         min_distance_to_merge = 100
         min_angle_to_merge = 100
         groups.append([lines[0]])
@@ -84,7 +82,6 @@ class HoughBundler:
         for line in lines:
             points.append(line[:2])
             points.append(line[2:])
-        # if 35 < orientation < 135:
         if 0 < orientation < 0:
             points = sorted(points, key=lambda point: point[1])
         else:
@@ -97,7 +94,6 @@ class HoughBundler:
         lines_y = []
         for line_i in [l[0] for l in lines]:
             orientation = self.get_orientation(line_i)
-            # if 45 < orientation < 135:
             if 0 < orientation < 0:
                 lines_y.append(line_i)
             else:
@@ -117,17 +113,6 @@ class HoughBundler:
 
         return merged_lines_all
 
-# def region_of_interest(image):
-#     height = image.shape[0]
-#     width = image.shape[1]
-#     polygons = np.array([
-#         [(0, height), (width, height), (700, 450), (500, 500)]
-#     ])
-#     mask = np.zeros_like(image)
-#     cv2.fillPoly(mask, polygons, 255)
-#     masked_image = cv2.bitwise_and(image, mask)
-#     return masked_image
-
 def region_of_interest(image):
     height = image.shape[0]
     width = image.shape[1]
@@ -139,6 +124,16 @@ def region_of_interest(image):
     masked_image = cv2.bitwise_and(image, mask)
     return masked_image
 
+
+def on_mouse_click(event, x, y, flags, param):
+    if event == cv2.EVENT_LBUTTONDOWN:
+        coordinates.append((x, y))
+        print(f"Clicked at (x, y): ({x}, {y})")
+        cv2.putText(frame,  f"Clicked at (x, y): ({x}, {y})", (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, GREEN, 2)
+
+cv2.namedWindow("frame")
+cv2.setMouseCallback("frame", on_mouse_click)
+
 while video.isOpened():
     ret, orig_frame = video.read()
     if not ret:
@@ -147,28 +142,41 @@ while video.isOpened():
     frame = cv2.GaussianBlur(orig_frame, (5, 5), 0)
 
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    # low_yellow = np.array([18, 94, 140])
-    # up_yellow = np.array([48, 255, 255])
     low_yellow = np.array([18, 94, 105])
     up_yellow = np.array([48, 255, 255])
     mask = cv2.inRange(hsv, low_yellow, up_yellow)
     edges = cv2.Canny(mask, 75, 150)
-    # lines = cv2.HoughLinesP(edges, 1, np.pi/180, 50, maxLineGap=50)
     cropped_image = region_of_interest(edges)
-    # lines = cv2.HoughLinesP(edges, 1, np.pi/180, 50, maxLineGap=50)
     lines = cv2.HoughLinesP(cropped_image, 1, np.pi / 180, 50, maxLineGap=50)
 
     if lines is not None:
         bundler = HoughBundler()
         merged_lines = bundler.process_lines(lines, edges)
 
+        if len(merged_lines) == 1:
+            x1, y1 = map(int, merged_lines[0][0])
+            x2, y2 = map(int, merged_lines[0][1])
+            # d1, e1 = (618, 463)
+            # d2, e2 = (225, 677)
+
+            d1, e1 = (573, 489)
+            d2, e2 = (260, 716)
+            # (1271, 690)
+            # (886, 521)
+            if x1 > 500:  # Green line on the left
+                cv2.line(frame, (d1, e1), (d2, e2), GREEN, THICKNESS)
+            else:  # Green line on the right
+                d1, e1 = (804, 494)
+                d2, e2 = (1250, 688)
+                cv2.line(frame, (d1, e1), (d2, e2), GREEN, THICKNESS)
+
         for line in merged_lines:
             x1, y1 = map(int, line[0])
             x2, y2 = map(int, line[1])
-            cv2.line(frame, (x1, y1), (x2, y2), (0, 255, 0), 5)
+            cv2.line(frame, (x1, y1), (x2, y2), GREEN, THICKNESS)
 
+    #cv2.imshow("cropped_image", cropped_image)
     cv2.imshow("frame", frame)
-    cv2.imshow("cropped_image", cropped_image)
 
 
     key = cv2.waitKey(1)
